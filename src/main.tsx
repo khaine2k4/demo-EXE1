@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import { BrowserRouter } from 'react-router-dom'
+import { HashRouter } from 'react-router-dom'
 import { AppStoreProvider } from './store/AppStore'
 import { ToastProvider } from './components/Toast'
 
@@ -10,9 +10,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ToastProvider>
       <AppStoreProvider>
-        <BrowserRouter>
+        <HashRouter>
           <App />
-        </BrowserRouter>
+        </HashRouter>
       </AppStoreProvider>
     </ToastProvider>
   </StrictMode>,
