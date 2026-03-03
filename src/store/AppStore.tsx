@@ -10,6 +10,7 @@ import type {
   Role,
   Transaction,
 } from '../types'
+import type { Photoset } from '../types'
 import {
   initialBookings,
   initialDisputes,
@@ -17,6 +18,7 @@ import {
   initialTransactions,
   mockUsers,
   photographers,
+  photosets,
 } from '../data/mock'
 
 // ── State ─────────────────────────────────────────────────────
@@ -24,6 +26,7 @@ type AppState = {
   currentUser: AuthUser | null
   users: AuthUser[]
   photographers: Photographer[]
+  photosets: import('../types').Photoset[]
   bookings: Booking[]
   payments: Payment[]
   disputes: Dispute[]
@@ -46,6 +49,10 @@ type AppActions = {
 
   // Photographer: Update profile
   updatePhotographer: (patch: Partial<Photographer>) => void
+
+  // Partner: tạo gói / album → hiện Khám phá & Portfolio
+  createPhotoset: (photoset: Photoset) => void
+  createAlbum: (album: import('../types').Album) => void
 
   // Booking lifecycle
   createBooking: (input: {
@@ -95,6 +102,7 @@ type Action =
   | { type: 'UPDATE_DISPUTE'; id: string; patch: Partial<Dispute> }
   | { type: 'ADD_TRANSACTION'; tx: Transaction }
   | { type: 'ADD_BUSY_DATE'; photographerId: string; date: string }
+  | { type: 'ADD_PHOTOSET'; photoset: Photoset }
 
 // ── Reducer ───────────────────────────────────────────────────
 function reducer(state: AppState, action: Action): AppState {
@@ -168,9 +176,22 @@ function reducer(state: AppState, action: Action): AppState {
         ),
       }
 
+    case 'ADD_PHOTOSET':
+      return { ...state, photosets: [action.photoset, ...state.photosets] }
+
     default:
       return state
   }
+}
+
+// Gộp albums từ mock vào photographers đã load (tránh mất album khi state cũ từ localStorage)
+function mergePhotographersWithMockAlbums(loaded: Photographer[]): Photographer[] {
+  return loaded.map((p) => {
+    const fromMock = photographers.find((m) => m.id === p.id)
+    if (fromMock?.albums?.length && (!p.albums || p.albums.length === 0))
+      return { ...p, albums: fromMock.albums }
+    return p
+  })
 }
 
 // ── Persistence ───────────────────────────────────────────────
@@ -179,10 +200,12 @@ function loadState(): AppState {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<AppState>
+      const loadedPhotographers = Array.isArray(parsed.photographers) ? parsed.photographers : photographers
       return {
         currentUser: parsed.currentUser ?? null,
         users: Array.isArray(parsed.users) ? parsed.users : mockUsers,
-        photographers: Array.isArray(parsed.photographers) ? parsed.photographers : photographers,
+        photographers: mergePhotographersWithMockAlbums(loadedPhotographers),
+        photosets: Array.isArray(parsed.photosets) ? parsed.photosets : photosets,
         bookings: Array.isArray(parsed.bookings) ? parsed.bookings : initialBookings,
         payments: Array.isArray(parsed.payments) ? parsed.payments : initialPayments,
         disputes: Array.isArray(parsed.disputes) ? parsed.disputes : initialDisputes,
@@ -194,6 +217,7 @@ function loadState(): AppState {
     currentUser: null,
     users: mockUsers,
     photographers,
+    photosets,
     bookings: initialBookings,
     payments: initialPayments,
     disputes: initialDisputes,
@@ -250,6 +274,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           busyDates: [],
           status: 'PENDING',
           portfolio: [],
+          albums: [],
         }
         dispatch({ type: 'ADD_PHOTOGRAPHER', photographer: ph })
       }
@@ -270,6 +295,16 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     updatePhotographer(patch) {
       if (!state.currentUser) return
       dispatch({ type: 'UPDATE_PHOTOGRAPHER', id: state.currentUser.id, patch })
+    },
+
+    createPhotoset(photoset) {
+      dispatch({ type: 'ADD_PHOTOSET', photoset })
+    },
+    createAlbum(album) {
+      const me = state.photographers.find((p) => p.id === album.photographerId)
+      if (!me) return
+      const albums = [...(me.albums ?? []), album]
+      dispatch({ type: 'UPDATE_PHOTOGRAPHER', id: me.id, patch: { albums } })
     },
 
     // ── Booking: create with full payment ────────────────────

@@ -7,7 +7,7 @@ import PhotoCard from '../components/PhotoCard'
 
 const HOW_IT_WORKS = [
   { icon: <Search className="h-6 w-6" />, step: '01', title: 'Tìm kiếm', desc: 'Khám phá hàng trăm nhiếp ảnh gia uy tín theo phong cách, địa điểm.' },
-  { icon: <Camera className="h-6 w-6" />, step: '02', title: 'Đặt lịch', desc: 'Chọn ngày, gói dịch vụ và thanh toán cọc 30% để giữ lịch.' },
+  { icon: <Camera className="h-6 w-6" />, step: '02', title: 'Đặt lịch', desc: 'Chọn ngày, gói chụp ảnh và thanh toán cọc 30% để giữ lịch.' },
   { icon: <Shield className="h-6 w-6" />, step: '03', title: 'Nhận ảnh', desc: 'Xem preview trước, thanh toán còn lại và tải ảnh gốc chất lượng cao.' },
 ]
 
@@ -72,12 +72,20 @@ export default function HomePage() {
                   className="h-full w-full bg-transparent text-[15px] font-bold text-white outline-none placeholder:text-slate-600"
                 />
               </div>
-              <Link
-                to="/gallery"
-                className="inline-flex h-18 items-center justify-center gap-3 rounded-3xl bg-white px-10 text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-2xl transition-all hover:bg-slate-50 hover:scale-[1.02] active:scale-95"
-              >
-                KHÁM PHÁ NGAY <ArrowRight className="h-4 w-4" />
-              </Link>
+              <div className="flex flex-wrap gap-3 justify-center">
+                <Link
+                  to="/gallery"
+                  className="inline-flex h-18 items-center justify-center gap-3 rounded-3xl bg-white px-10 text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-2xl transition-all hover:bg-slate-50 hover:scale-[1.02] active:scale-95"
+                >
+                  KHÁM PHÁ NGAY <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  to="/photosets"
+                  className="inline-flex h-18 items-center justify-center gap-3 rounded-3xl bg-white/10 px-10 text-[11px] font-black uppercase tracking-[0.2em] text-white ring-1 ring-white/20 shadow-2xl backdrop-blur transition-all hover:bg-white/20 hover:scale-[1.02] active:scale-95"
+                >
+                  XEM GÓI CHỤP
+                </Link>
+              </div>
             </div>
           </motion.div>
 

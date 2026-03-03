@@ -61,6 +61,20 @@ export type Booking = {
 // ── Photographer approval ────────────────────────────────────
 export type PhotographerStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 
+// Album: partner tạo album, ảnh hiện Portfolio Showcase & Khám phá
+export type AlbumImage = { id: string; url: string; title?: string }
+
+export type Album = {
+  id: string
+  photographerId: string
+  title: string
+  coverUrl: string
+  images: AlbumImage[]
+  createdAt: string
+  /** Gói chụp ảnh liên kết — dùng trên trang Bộ sưu tập & chi tiết album */
+  photosetId?: string
+}
+
 export type Photographer = {
   id: string           // same as userId
   name: string
@@ -75,6 +89,7 @@ export type Photographer = {
   busyDates: string[]  // YYYY-MM-DD
   status: PhotographerStatus
   portfolio: { id: string; url: string; title?: string }[]
+  albums?: Album[]     // album do partner tạo → ảnh hiện Portfolio
 }
 
 // ── Auth User ────────────────────────────────────────────────
@@ -109,4 +124,64 @@ export type Dispute = {
   createdAt: string
   resolvedAt?: string
   adminNote?: string
+}
+
+// ── Photoset (Moments-style packages) ─────────────────────────
+export type AddOn = {
+  id: string
+  name: string
+  price: number
+}
+
+export type PhotosetPhotographer = {
+  id: string       // photographer id, e.g. PH001
+  name: string
+  avatar: string
+  rating: number
+  reviewCount: number
+  location: string
+  address?: string
+  bio: string
+}
+
+// Album thuộc gói chụp (photoset) — ảnh trong album dùng cho Portfolio Showcase
+export type PhotosetAlbumImage = { id: string; url: string; title?: string }
+
+export type PhotosetAlbum = {
+  id: string
+  title: string
+  coverUrl: string
+  images: PhotosetAlbumImage[]
+}
+
+export type Photoset = {
+  id: string
+  title: string
+  price: number
+  currency: string
+  coverImage: string
+  coverAspectRatio?: number
+  images: string[]
+  tags: string[]
+  description: string
+  features: string[]
+  photographer: PhotosetPhotographer
+  packageDetails: {
+    standard: { price: number; features: string[] }
+    premium?: { price: number; features: string[] }
+    deluxe?: { price: number; features: string[] }
+  }
+  addOns: AddOn[]
+  policies: string[]
+  /** Album trong gói — Portfolio Showcase của photographer = ảnh từ các album trong gói của họ */
+  albums?: PhotosetAlbum[]
+}
+
+export type TimeSlot = {
+  id: string
+  start: string
+  end: string
+  duration: string
+  isAvailable: boolean
+  isRecommended?: boolean
 }

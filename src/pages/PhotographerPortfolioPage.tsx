@@ -1,8 +1,9 @@
 import { useAppStore } from '../store/AppStore'
-import { Camera, UploadCloud, Image as ImageIcon, Settings, X, CheckCircle, Wallet } from 'lucide-react'
+import { Camera, UploadCloud, Image as ImageIcon, Settings, X, CheckCircle, Wallet, Package, FolderPlus } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
 import { useToast } from '../components/Toast'
+import type { Photoset, Album } from '../types'
 
 function formatVnd(v: number) {
   return new Intl.NumberFormat('vi-VN').format(v) + ' ₫'
@@ -27,6 +28,10 @@ export default function PhotographerPortfolioPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [createPackageOpen, setCreatePackageOpen] = useState(false)
+  const [createAlbumOpen, setCreateAlbumOpen] = useState(false)
+  const [packageForm, setPackageForm] = useState({ title: '', price: '1000000', coverUrl: MOCK_UPLOADS[0], description: '', tags: '' })
+  const [albumForm, setAlbumForm] = useState({ title: '', coverUrl: MOCK_UPLOADS[0], photosetId: '' })
 
   const photographer = state.photographers.find((p) => p.id === state.currentUser?.id)
 
@@ -81,6 +86,68 @@ export default function PhotographerPortfolioPage() {
     })
     toast.push({ type: 'success', title: 'Upload thành công! 📸', message: 'Tác phẩm mới đã được thêm vào bộ sưu tập.' })
     setUploading(false)
+  }
+
+  function handleCreatePackage() {
+    if (!photographer) return
+    const price = Number(packageForm.price) || 0
+    const tags = packageForm.tags.split(',').map(t => t.trim()).filter(Boolean)
+    const photoset: Photoset = {
+      id: `ps-${uid()}`,
+      title: packageForm.title || 'Gói mới',
+      price,
+      currency: 'đ',
+      coverImage: packageForm.coverUrl,
+      coverAspectRatio: 1.5,
+      images: [packageForm.coverUrl, ...MOCK_UPLOADS.slice(0, 3)],
+      tags: tags.length ? tags : ['Portrait'],
+      description: packageForm.description || 'Gói chụp ảnh chuyên nghiệp.',
+      features: ['Ảnh chỉnh sửa', '2 giờ chụp', '2 lần đổi trang phục'],
+      photographer: {
+        id: photographer.id,
+        name: photographer.name,
+        avatar: photographer.avatarUrl,
+        rating: photographer.rating,
+        reviewCount: photographer.reviewCount,
+        location: photographer.location,
+        bio: photographer.bio,
+      },
+      packageDetails: {
+        standard: { price, features: ['Ảnh chỉnh sửa', '2 giờ chụp'] },
+      },
+      addOns: [],
+      policies: ['Hủy trước 48h: hoàn 100%'],
+      albums: [], // Studio thêm album sau bằng ảnh từ Portfolio Showcase
+    }
+    actions.createPhotoset(photoset)
+    toast.push({ type: 'success', title: 'Đã tạo gói! 📦', message: 'Gói của bạn sẽ hiện ở Bộ sưu tập / Khám phá.' })
+    setCreatePackageOpen(false)
+    setPackageForm({ title: '', price: String(photographer.startingPrice), coverUrl: MOCK_UPLOADS[0], description: '', tags: '' })
+  }
+
+  function handleCreateAlbum() {
+    if (!photographer) return
+    const albumId = `alb-${uid()}`
+    const portfolioImages = photographer.portfolio.slice(0, 6).map((p, i) => ({
+      id: `${albumId}-img-${i}`,
+      url: p.url,
+      title: p.title,
+    }))
+    const images = portfolioImages.length > 0 ? portfolioImages : MOCK_UPLOADS.slice(0, 4).map((url, i) => ({ id: `${albumId}-img-${i}`, url, title: `Ảnh ${i + 1}` }))
+    const coverUrl = albumForm.coverUrl || (photographer.portfolio[0]?.url ?? MOCK_UPLOADS[0])
+    const album: Album = {
+      id: albumId,
+      photographerId: photographer.id,
+      title: albumForm.title || 'Album mới',
+      coverUrl,
+      images,
+      createdAt: new Date().toISOString(),
+      photosetId: albumForm.photosetId || undefined,
+    }
+    actions.createAlbum(album)
+    toast.push({ type: 'success', title: 'Đã tạo album! 🖼️', message: 'Album xuất hiện ở Bộ sưu tập, gắn với gói chụp ảnh đã chọn.' })
+    setCreateAlbumOpen(false)
+    setAlbumForm({ title: '', coverUrl: MOCK_UPLOADS[0], photosetId: '' })
   }
 
   return (
@@ -158,16 +225,30 @@ export default function PhotographerPortfolioPage() {
               <div>
                 <h2 className="text-xl font-black text-slate-900 leading-tight">Bộ sưu tập Tác phẩm</h2>
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                  Hiển thị cho khách hàng trên trang công khai
+                  Hiển thị cho khách hàng trên trang công khai · Tạo gói/album để hiện ở Khám phá
                 </p>
               </div>
-              <button
-                onClick={handleUploadMock}
-                disabled={uploading}
-                className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-6 text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${uploading ? 'bg-slate-50 border-slate-200 text-slate-300' : 'bg-white border-slate-200 text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50/50 shadow-indigo-100/20'}`}
-              >
-                <UploadCloud className="h-4 w-4" /> {uploading ? 'ĐANG TẢI...' : 'THÊM ẢNH MỚI'}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setCreatePackageOpen(true)}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-6 text-[10px] font-black uppercase tracking-widest text-indigo-700 transition-all shadow-sm hover:bg-indigo-100 active:scale-95"
+                >
+                  <Package className="h-4 w-4" /> TẠO GÓI
+                </button>
+                <button
+                  onClick={() => setCreateAlbumOpen(true)}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 text-[10px] font-black uppercase tracking-widest text-slate-700 transition-all shadow-sm hover:bg-slate-50 active:scale-95"
+                >
+                  <FolderPlus className="h-4 w-4" /> TẠO ALBUM
+                </button>
+                <button
+                  onClick={handleUploadMock}
+                  disabled={uploading}
+                  className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-6 text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${uploading ? 'bg-slate-50 border-slate-200 text-slate-300' : 'bg-white border-slate-200 text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50/50 shadow-indigo-100/20'}`}
+                >
+                  <UploadCloud className="h-4 w-4" /> {uploading ? 'ĐANG TẢI...' : 'THÊM ẢNH MỚI'}
+                </button>
+              </div>
             </div>
 
             <div className="p-6 md:p-8">
@@ -320,6 +401,60 @@ export default function PhotographerPortfolioPage() {
                   className={`flex-1 flex items-center justify-center gap-2 rounded-2xl h-14 text-[11px] font-black uppercase tracking-widest text-white shadow-xl shadow-indigo-600/20 transition-all active:scale-[0.98] ${loading ? 'bg-slate-300' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
                   {loading ? 'ĐANG LƯU...' : 'LƯU THAY ĐỔI'}
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Tạo gói */}
+      <AnimatePresence>
+        {createPackageOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setCreatePackageOpen(false)} className="absolute inset-0 bg-slate-950/40 backdrop-blur-xl" />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md rounded-[32px] border border-slate-200 bg-white p-8 shadow-2xl">
+              <h3 className="text-xl font-black text-slate-900 mb-6">Tạo gói chụp</h3>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4">Gói sẽ hiện ở Bộ sưu tập / Khám phá</p>
+              <div className="space-y-4">
+                <input placeholder="Tên gói" value={packageForm.title} onChange={e => setPackageForm(f => ({ ...f, title: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500" />
+                <input type="number" placeholder="Giá (VNĐ)" value={packageForm.price} onChange={e => setPackageForm(f => ({ ...f, price: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500" />
+                <input placeholder="URL ảnh bìa" value={packageForm.coverUrl} onChange={e => setPackageForm(f => ({ ...f, coverUrl: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500" />
+                <textarea placeholder="Mô tả" value={packageForm.description} onChange={e => setPackageForm(f => ({ ...f, description: e.target.value }))} rows={2} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500" />
+                <input placeholder="Tags (cách nhau bởi dấu phẩy)" value={packageForm.tags} onChange={e => setPackageForm(f => ({ ...f, tags: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+              <div className="mt-8 flex gap-3">
+                <button onClick={() => setCreatePackageOpen(false)} className="flex-1 rounded-xl border border-slate-200 py-3 text-[11px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">Hủy</button>
+                <button onClick={handleCreatePackage} className="flex-1 rounded-xl bg-indigo-600 py-3 text-[11px] font-black uppercase tracking-widest text-white hover:bg-indigo-700">Tạo gói</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Tạo album */}
+      <AnimatePresence>
+        {createAlbumOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setCreateAlbumOpen(false)} className="absolute inset-0 bg-slate-950/40 backdrop-blur-xl" />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md rounded-[32px] border border-slate-200 bg-white p-8 shadow-2xl">
+              <h3 className="text-xl font-black text-slate-900 mb-6">Tạo album</h3>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4">Ảnh trong album lấy từ Portfolio Showcase. Chọn gói chụp ảnh để album hiện ở Bộ sưu tập.</p>
+              <div className="space-y-4">
+                <input placeholder="Tên album" value={albumForm.title} onChange={e => setAlbumForm(f => ({ ...f, title: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500" />
+                <input placeholder="URL ảnh bìa" value={albumForm.coverUrl} onChange={e => setAlbumForm(f => ({ ...f, coverUrl: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500" />
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Gói chụp ảnh liên kết</label>
+                  <select value={albumForm.photosetId} onChange={e => setAlbumForm(f => ({ ...f, photosetId: e.target.value }))} className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                    <option value="">— Không liên kết —</option>
+                    {state.photosets.filter(ps => ps.photographer.id === photographer.id).map(ps => (
+                      <option key={ps.id} value={ps.id}>{ps.title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="mt-8 flex gap-3">
+                <button onClick={() => setCreateAlbumOpen(false)} className="flex-1 rounded-xl border border-slate-200 py-3 text-[11px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">Hủy</button>
+                <button onClick={handleCreateAlbum} className="flex-1 rounded-xl bg-indigo-600 py-3 text-[11px] font-black uppercase tracking-widest text-white hover:bg-indigo-700">Tạo album</button>
               </div>
             </motion.div>
           </div>

@@ -2,6 +2,9 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
 import GalleryPage from './pages/GalleryPage'
+import PhotosetsPage from './pages/PhotosetsPage'
+import PhotosetDetailPage from './pages/PhotosetDetailPage'
+import AlbumDetailPage from './pages/AlbumDetailPage'
 import PhotographerProfilePage from './pages/PhotographerProfilePage'
 import CustomerBookingsPage from './pages/CustomerBookingsPage'
 import CustomerBookingDetailPage from './pages/CustomerBookingDetailPage'
@@ -41,6 +44,15 @@ export default function App() {
         } />
         <Route path="/gallery" element={
           <RequireAuth><GalleryPage /></RequireAuth>
+        } />
+        <Route path="/photosets" element={
+          <RequireAuth><PhotosetsPage /></RequireAuth>
+        } />
+        <Route path="/photosets/:id" element={
+          <RequireAuth><PhotosetDetailPage /></RequireAuth>
+        } />
+        <Route path="/albums/:id" element={
+          <RequireAuth><AlbumDetailPage /></RequireAuth>
         } />
         <Route path="/photographers/:id" element={
           <RequireAuth><PhotographerProfilePage /></RequireAuth>

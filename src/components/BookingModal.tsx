@@ -4,28 +4,24 @@ import { X, Calendar, CreditCard, Check, Lock, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import BookingCalendar from './BookingCalendar'
 import { useAppStore } from '../store/AppStore'
-import type { Photographer } from '../types'
+import type { Photographer, Photoset } from '../types'
 
-const PACKAGES = {
-  STANDARD: { label: 'Standard', desc: '2 giờ · 30 ảnh edited', price: (base: number) => base },
-  PREMIUM: { label: 'Premium', desc: '4 giờ · 70 ảnh edited + album', price: (base: number) => Math.round(base * 1.6) },
-  DELUXE: { label: 'Deluxe', desc: 'Full day · 150 ảnh + video', price: (base: number) => Math.round(base * 2.75) },
-}
-
-type Step = 'date' | 'package' | 'payment' | 'success'
+type Step = 'date' | 'addons' | 'payment' | 'success'
 
 const STEPS: { key: Step; label: string; icon: React.ReactNode }[] = [
   { key: 'date', label: 'Thời gian', icon: <Calendar className="h-4 w-4" /> },
-  { key: 'package', label: 'Dịch vụ', icon: <ShieldCheck className="h-4 w-4" /> },
+  { key: 'addons', label: 'Dịch vụ thêm', icon: <ShieldCheck className="h-4 w-4" /> },
   { key: 'payment', label: 'Thanh toán', icon: <CreditCard className="h-4 w-4" /> },
 ]
 
 export default function BookingModal({
   photographer,
+  photoset,
   open,
   onClose,
 }: {
   photographer: Photographer
+  photoset?: Photoset
   open: boolean
   onClose: () => void
 }) {
@@ -34,13 +30,22 @@ export default function BookingModal({
 
   const [step, setStep] = useState<Step>('date')
   const [date, setDate] = useState('')
-  const [pkg, setPkg] = useState<keyof typeof PACKAGES>('PREMIUM')
+  const [selectedAddOnIds, setSelectedAddOnIds] = useState<string[]>([])
   const [card, setCard] = useState({ cardNumber: '', expiry: '', cvc: '' })
   const [paying, setPaying] = useState(false)
   const [error, setError] = useState('')
 
   const stepIdx = STEPS.findIndex((s) => s.key === step)
-  const totalPrice = PACKAGES[pkg].price(photographer.startingPrice)
+  const basePrice = photoset ? photoset.packageDetails.standard.price : photographer.startingPrice
+  const addOns = photoset?.addOns ?? []
+  const addOnsTotal = addOns
+    .filter((ao) => selectedAddOnIds.includes(ao.id))
+    .reduce((s, ao) => s + ao.price, 0)
+  const totalPrice = basePrice + addOnsTotal
+
+  function toggleAddOn(id: string) {
+    setSelectedAddOnIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
 
   function formatVnd(v: number) { return new Intl.NumberFormat('vi-VN').format(v) + ' ₫' }
 
@@ -51,7 +56,7 @@ export default function BookingModal({
       await actions.createBooking({
         photographerId: photographer.id,
         date,
-        packageTier: pkg,
+        packageTier: 'STANDARD',
         totalPrice,
         cardNumber: card.cardNumber,
         expiry: card.expiry,
@@ -84,19 +89,27 @@ export default function BookingModal({
             className="relative w-full max-w-[440px] overflow-hidden rounded-[32px] bg-white shadow-2xl"
           >
             {step === 'success' ? (
-              <SuccessView photographer={photographer} date={date} pkg={pkg} totalPrice={totalPrice} onClose={() => {
-                onClose()
-                nav('/customer/bookings')
-              }} />
+              <SuccessView
+                photographer={photographer}
+                photoset={photoset}
+                date={date}
+                selectedAddOnIds={selectedAddOnIds}
+                addOns={addOns}
+                totalPrice={totalPrice}
+                onClose={() => {
+                  onClose()
+                  nav('/customer/bookings')
+                }}
+              />
             ) : (
               <>
                 {/* Header */}
                 <div className="relative border-b border-slate-100 bg-white px-8 py-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-lg font-black tracking-tight text-slate-900">Đặt lịch chụp ảnh</h2>
+                      <h2 className="text-lg font-black tracking-tight text-slate-900">{photoset ? 'Đặt lịch gói chụp' : 'Đặt lịch chụp ảnh'}</h2>
                       <p className="mt-1 text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <span className="text-indigo-600">●</span> {photographer.name}
+                        <span className="text-indigo-600">●</span> {photoset ? photoset.title : photographer.name}
                       </p>
                     </div>
                     <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
@@ -130,7 +143,7 @@ export default function BookingModal({
                         <BookingCalendar value={date} onChange={setDate} busyDates={photographer.busyDates} />
                         <button
                           disabled={!date}
-                          onClick={() => setStep('package')}
+                          onClick={() => setStep('addons')}
                           className={`mt-6 flex h-14 w-full items-center justify-center rounded-2xl text-sm font-black text-white shadow-xl transition-all active:scale-[0.98] ${date ? 'bg-indigo-600 shadow-indigo-600/20 hover:bg-indigo-700' : 'bg-slate-200 text-slate-400 shadow-none cursor-not-allowed'}`}
                         >
                           Tiếp theo
@@ -138,33 +151,57 @@ export default function BookingModal({
                       </motion.div>
                     )}
 
-                    {step === 'package' && (
-                      <motion.div key="package" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }} className="space-y-4">
-                        <div className="mb-2 text-xs font-black uppercase tracking-widest text-slate-400">Bước 2: Chọn gói</div>
-                        {(Object.entries(PACKAGES) as [keyof typeof PACKAGES, typeof PACKAGES[keyof typeof PACKAGES]][]).map(([key, info]) => {
-                          const price = info.price(photographer.startingPrice)
-                          const selected = pkg === key
-                          return (
-                            <button key={key} onClick={() => setPkg(key)}
-                              className={`group relative w-full overflow-hidden rounded-2xl border p-5 text-left transition-all ${selected ? 'border-indigo-500 bg-indigo-50/50 ring-1 ring-indigo-500' : 'border-slate-100 bg-slate-50 hover:border-slate-200 hover:bg-white'}`}>
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className={`text-sm font-black ${selected ? 'text-indigo-900' : 'text-slate-900'}`}>{info.label}</div>
-                                  <div className="mt-1 text-xs font-medium text-slate-500 leading-relaxed">{info.desc}</div>
-                                </div>
-                                <div className="text-right">
-                                  <div className={`text-sm font-black ${selected ? 'text-indigo-700' : 'text-slate-900'}`}>{formatVnd(price)}</div>
-                                  <div className="mt-0.5 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Trả trước 100%</div>
-                                </div>
-                              </div>
-                              {selected && <div className="absolute top-0 right-0 h-10 w-10 bg-indigo-600 [clip-path:polygon(100%_0,0_0,100%_100%)] flex items-start justify-end p-1.5"><Check className="h-3 w-3 text-white" /></div>}
-                            </button>
-                          )
-                        })}
+                    {step === 'addons' && (
+                      <motion.div key="addons" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }} className="space-y-4">
+                        <div className="mb-2 text-xs font-black uppercase tracking-widest text-slate-400">Bước 2: Gói & dịch vụ thêm</div>
 
-                        <button onClick={() => setStep('payment')}
-                          className="mt-4 flex h-14 w-full items-center justify-center rounded-2xl bg-indigo-600 text-sm font-black text-white shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-[0.98]">
-                          Thanh toán {formatVnd(PACKAGES[pkg].price(photographer.startingPrice))}
+                        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-5">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <div className="text-sm font-black text-slate-900">{photoset ? photoset.title : 'Chụp ảnh'}</div>
+                              <div className="mt-0.5 text-xs text-slate-500">Giá gói cơ bản</div>
+                            </div>
+                            <div className="text-sm font-black text-slate-900">{formatVnd(basePrice)}</div>
+                          </div>
+                        </div>
+
+                        {addOns.length > 0 && (
+                          <>
+                            <div className="text-[11px] font-black uppercase tracking-widest text-slate-400">Add-on (tùy chọn)</div>
+                            <div className="space-y-2">
+                              {addOns.map((ao) => {
+                                const selected = selectedAddOnIds.includes(ao.id)
+                                return (
+                                  <button
+                                    key={ao.id}
+                                    type="button"
+                                    onClick={() => toggleAddOn(ao.id)}
+                                    className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left transition-all ${selected ? 'border-indigo-500 bg-indigo-50/50 ring-1 ring-indigo-500' : 'border-slate-100 bg-white hover:border-slate-200'}`}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 ${selected ? 'border-indigo-600 bg-indigo-600' : 'border-slate-200'}`}>
+                                        {selected && <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />}
+                                      </div>
+                                      <span className="text-sm font-bold text-slate-900">{ao.name}</span>
+                                    </div>
+                                    <span className="text-sm font-black text-indigo-600">+{formatVnd(ao.price)}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </>
+                        )}
+
+                        <div className="rounded-2xl border-2 border-indigo-100 bg-indigo-50/50 p-4 flex justify-between items-center">
+                          <span className="text-sm font-black text-slate-900">Tổng cộng</span>
+                          <span className="text-lg font-black text-indigo-700">{formatVnd(totalPrice)}</span>
+                        </div>
+
+                        <button
+                          onClick={() => setStep('payment')}
+                          className="mt-2 flex h-14 w-full items-center justify-center rounded-2xl bg-indigo-600 text-sm font-black text-white shadow-xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
+                        >
+                          Thanh toán {formatVnd(totalPrice)}
                         </button>
                         <button onClick={() => setStep('date')} className="w-full text-center text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition">← Quay lại</button>
                       </motion.div>
@@ -177,9 +214,15 @@ export default function BookingModal({
                         <div className="space-y-4">
                           <div className="rounded-2xl bg-slate-50 p-5 ring-1 ring-inset ring-slate-100">
                             <div className="flex justify-between text-sm">
-                              <span className="font-bold text-slate-500">Gói {PACKAGES[pkg].label}</span>
-                              <span className="font-black text-slate-900">{formatVnd(totalPrice)}</span>
+                              <span className="font-bold text-slate-500">{photoset ? photoset.title : 'Chụp ảnh'}</span>
+                              <span className="font-black text-slate-900">{formatVnd(basePrice)}</span>
                             </div>
+                            {selectedAddOnIds.length > 0 && addOns.filter((ao) => selectedAddOnIds.includes(ao.id)).map((ao) => (
+                              <div key={ao.id} className="flex justify-between text-sm mt-2">
+                                <span className="font-medium text-slate-500">+ {ao.name}</span>
+                                <span className="font-black text-slate-700">{formatVnd(ao.price)}</span>
+                              </div>
+                            ))}
                             <div className="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4">
                               <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
                                 <span>Dịch vụ Escrow bảo đảm</span>
@@ -222,7 +265,7 @@ export default function BookingModal({
                             ĐANG XỬ LÝ...
                           </> : <><Lock className="h-4.2 w-4.2" /> KHỞI TẠO ESCROW</>}
                         </button>
-                        <button onClick={() => setStep('package')} className="w-full text-center text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition">← BƯỚC TRƯỚC</button>
+                        <button onClick={() => setStep('addons')} className="w-full text-center text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition">← BƯỚC TRƯỚC</button>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -236,9 +279,24 @@ export default function BookingModal({
   )
 }
 
-function SuccessView({ photographer, date, pkg, totalPrice, onClose }: {
-  photographer: Photographer; date: string; pkg: keyof typeof PACKAGES; totalPrice: number; onClose: () => void
+function SuccessView({
+  photographer,
+  photoset,
+  date,
+  selectedAddOnIds,
+  addOns,
+  totalPrice,
+  onClose,
+}: {
+  photographer: Photographer
+  photoset?: Photoset
+  date: string
+  selectedAddOnIds: string[]
+  addOns: { id: string; name: string; price: number }[]
+  totalPrice: number
+  onClose: () => void
 }) {
+  const selectedAddOns = addOns.filter((ao) => selectedAddOnIds.includes(ao.id))
   return (
     <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="px-10 py-12 text-center">
       <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[28px] bg-emerald-100 shadow-lg shadow-emerald-500/10">
@@ -252,7 +310,10 @@ function SuccessView({ photographer, date, pkg, totalPrice, onClose }: {
       <div className="mt-8 overflow-hidden rounded-[24px] border border-slate-100 bg-slate-50 p-1">
         <div className="bg-white rounded-[20px] p-5 text-sm text-left space-y-3 shadow-sm ring-1 ring-slate-100">
           <div className="flex justify-between"><span className="font-bold text-slate-400 uppercase text-[10px] tracking-widest">Nhiếp ảnh gia</span><span className="font-black text-slate-900">{photographer.name}</span></div>
-          <div className="flex justify-between"><span className="font-bold text-slate-400 uppercase text-[10px] tracking-widest">Gói dịch vụ</span><span className="font-black text-indigo-600">{PACKAGES[pkg].label}</span></div>
+          <div className="flex justify-between"><span className="font-bold text-slate-400 uppercase text-[10px] tracking-widest">Gói</span><span className="font-black text-indigo-600">{photoset ? photoset.title : 'Chụp ảnh'}</span></div>
+          {selectedAddOns.length > 0 && (
+            <div className="flex justify-between items-start gap-2"><span className="font-bold text-slate-400 uppercase text-[10px] tracking-widest shrink-0">Add-on</span><span className="font-medium text-slate-700 text-right">{selectedAddOns.map((ao) => ao.name).join(', ')}</span></div>
+          )}
           <div className="flex justify-between"><span className="font-bold text-slate-400 uppercase text-[10px] tracking-widest">Ngày chụp</span><span className="font-black text-slate-900">{new Date(date + 'T00:00:00').toLocaleDateString('vi-VN', { dateStyle: 'long' })}</span></div>
           <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
             <span className="font-black text-slate-900">Đã thanh toán</span>

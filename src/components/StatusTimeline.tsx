@@ -1,7 +1,7 @@
 import { useAppStore } from '../store/AppStore'
 import { motion } from 'framer-motion'
 import type { BookingStatus } from '../types'
-import { Check, Clock, AlertTriangle, ShieldX } from 'lucide-react'
+import { Check, AlertTriangle, ShieldX } from 'lucide-react'
 
 // Main linear flow for a successful booking
 const SUCCESS_ORDER: BookingStatus[] = ['PENDING', 'CONFIRMED', 'DELIVERED', 'COMPLETED']

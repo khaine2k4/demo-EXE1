@@ -8,6 +8,7 @@ const NAV: Record<string, { label: string; to: string }[]> = {
   USER: [
     { label: 'Trang chủ', to: '/' },
     { label: 'Khám phá', to: '/gallery' },
+    { label: 'Bộ sưu tập', to: '/photosets' },
     { label: 'Bookings', to: '/customer/bookings' },
   ],
   PHOTOGRAPHER: [
