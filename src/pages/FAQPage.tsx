@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, MessageCircle, HelpCircle, ShieldCheck } from 'lucide-react'
-import { useAppStore } from '../store/AppStore'
 
 const faqs = [
   {
@@ -49,7 +48,6 @@ const faqs = [
 ]
 
 export default function FAQPage() {
-  const { state } = useAppStore()
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({})
 
   const toggleItem = (id: string) => {
