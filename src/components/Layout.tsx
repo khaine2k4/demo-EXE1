@@ -10,15 +10,20 @@ const NAV: Record<string, { label: string; to: string }[]> = {
     { label: 'Khám phá', to: '/gallery' },
     { label: 'Bộ sưu tập', to: '/photosets' },
     { label: 'Bookings', to: '/customer/bookings' },
+    { label: 'FAQ', to: '/faq' },
+    { label: 'Premier', to: '/premier' },
   ],
   PHOTOGRAPHER: [
     { label: 'Dashboard', to: '/photographer/dashboard' },
     { label: 'Portfolio', to: '/photographer/portfolio' },
     { label: 'Ví tiền', to: '/photographer/wallet' },
+    { label: 'FAQ', to: '/faq' },
+    { label: 'Premier', to: '/premier' },
   ],
   ADMIN: [
     { label: 'Người dùng', to: '/admin/users' },
     { label: 'Đơn hàng', to: '/admin/orders' },
+    { label: 'Hỗ trợ/Risks', to: '/admin/support' },
   ],
 }
 

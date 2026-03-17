@@ -17,6 +17,9 @@ import AdminOrdersPage from './pages/AdminOrdersPage'
 import NotFoundPage from './pages/NotFoundPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import PremierPage from './pages/PremierPage'
+import AdminSupportPage from './pages/AdminSupportPage'
+import FAQPage from './pages/FAQPage'
 import { useAppStore } from './store/AppStore'
 
 function RequireAuth({ children, role }: { children: React.ReactNode; role?: string }) {
@@ -63,6 +66,12 @@ export default function App() {
         <Route path="/customer/bookings/:id" element={
           <RequireAuth role="USER"><CustomerBookingDetailPage /></RequireAuth>
         } />
+        <Route path="/premier" element={
+          <RequireAuth><PremierPage /></RequireAuth>
+        } />
+        <Route path="/faq" element={
+          <RequireAuth><FAQPage /></RequireAuth>
+        } />
 
         {/* Photographer */}
         <Route path="/photographer/portfolio" element={
@@ -84,6 +93,9 @@ export default function App() {
         } />
         <Route path="/admin/orders" element={
           <RequireAuth role="ADMIN"><AdminOrdersPage /></RequireAuth>
+        } />
+        <Route path="/admin/support" element={
+          <RequireAuth role="ADMIN"><AdminSupportPage /></RequireAuth>
         } />
 
         {/* Redirect root based on role if logged in */}
