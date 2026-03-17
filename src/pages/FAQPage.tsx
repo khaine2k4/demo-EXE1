@@ -1,127 +1,195 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, MessageCircle, HelpCircle, ShieldCheck } from 'lucide-react'
+import { Send, Bot, User, Sparkles, HelpCircle } from 'lucide-react'
 
-const faqs = [
-  {
-    category: 'Thanh toán & Đặt cọc',
-    icon: <ShieldCheck className="h-5 w-5 text-emerald-500" />,
-    items: [
-      {
-        q: 'Tiền cọc của tôi được giữ như thế nào?',
-        a: 'PhotoMarket sử dụng hệ thống Escrow an toàn. Tiền cọc (30%) của bạn sẽ được nền tảng giữ lại và chỉ chuyển cho Nhiếp ảnh gia sau khi bộ ảnh được giao thành công hoặc khi bạn xác nhận hoàn tất dịch vụ.'
-      },
-      {
-        q: 'Tôi muốn hủy lịch, có được hoàn cọc không?',
-        a: 'Tùy thuộc vào chính sách của từng photographer và thời điểm báo hủy. Thông thường, nếu báo trước 7 ngày, bạn sẽ được hoàn 100%. Nếu sát ngày, cọc có thể không được hoàn lại. Vui lòng xem kỹ "Chính sách hủy" của mỗi gói chụp.'
-      }
-    ]
-  },
-  {
-    category: 'Giao nhận ảnh',
-    icon: <MessageCircle className="h-5 w-5 text-indigo-500" />,
-    items: [
-      {
-        q: 'Tôi sẽ nhận ảnh qua đâu?',
-        a: 'Sau khi chụp xong, Nhiếp ảnh gia sẽ tải ảnh lên hệ thống PhotoMarket. Bạn có thể xem trước hình ảnh (có watermark). Sau khi thanh toán phần còn lại, hệ thống sẽ mở khóa link tải ảnh gốc chất lượng cao cho bạn.'
-      },
-      {
-        q: 'Photographer giao ảnh trễ hạn thì sao?',
-        a: 'Bạn có quyền tạo yêu cầu "Khiếu nại (Dispute)" trong phần quản lý Booking. Admin của hệ thống sẽ kiểm tra log làm việc và có thể hoàn một phần hoặc toàn bộ số tiền tùy theo mức độ trễ hạn.'
-      }
-    ]
-  },
-  {
-    category: 'Photographer',
-    icon: <HelpCircle className="h-5 w-5 text-amber-500" />,
-    items: [
-      {
-        q: 'Bao lâu thì tôi nhận được tiền từ hệ thống?',
-        a: 'Sau khi Khách hàng bấm "Hoàn tất" hoặc sau 48h kể từ khi giao ảnh mà khách không phản hồi, hệ thống sẽ tự động chuyển trạng thái hoàn thành. Tiền sẽ về "Ví tiền (Wallet)" của bạn ngay lập tức. Sau đó bạn có thể rút về tài khoản ngân hàng.'
-      },
-      {
-        q: 'Tôi có thể thay đổi giá các gói chụp không?',
-        a: 'Bạn hoàn toàn có thể cập nhật giá và chi tiết gói chụp (Photoset) trong phần Quản lý Portfolio. Tuy nhiên, các giá này sẽ chỉ áp dụng cho những booking mới. Những booking đã lên lịch sẽ giữ nguyên giá cũ.'
-      }
-    ]
-  }
+type Message = {
+  id: string
+  type: 'user' | 'bot'
+  text: string
+  options?: string[]
+}
+
+const FAQ_KNOWLEDGE: Record<string, string> = {
+  'rút tiền': 'Tiền của bạn sẽ được chuyển vào Ví (Wallet) sau khi khách hàng xác nhận hoàn tất giao dịch hoặc sau 48h tự động. Từ Ví, bạn có thể tạo lệnh Rút tiền về tài khoản ngân hàng liên kết trong vòng 1-2 ngày làm việc.',
+  'đặt cọc': 'PhotoMarket sử dụng hệ thống Escrow an toàn. Khi khách hàng đặt lịch, họ cần thanh toán cọc 30%. Số tiền này do hệ thống giữ và chỉ giải ngân cho Photographer khi đã giao ảnh thành công.',
+  'hủy lịch': 'Nếu bạn là Khách hàng: Hủy trước 7 ngày sẽ được hoàn 100% cọc. Hủy sát ngày (dưới 3 ngày) cọc không được hoàn lại.\nNếu bạn là Photographer: Việc hủy lịch sẽ làm giảm điểm uy tín và có thể bị khóa tài khoản nếu tỷ lệ hủy quá cao (trên 15%).',
+  'khiếu nại': 'Khách hàng có thể mở khiếu nại (Dispute) nếu hình ảnh nhận được không đạt chất lượng cam kết hoặc vi phạm thời gian giao ảnh trên 3 ngày. Bạn vui lòng vào Chi tiết Booking -> chọn "Khiếu nại booking" để Admin can thiệp xử lý.',
+  'gói chụp': 'Photographer có thể tự do tạo và tùy chỉnh các Gói chụp (Photosets) cá nhân. Mức giá thấp nhất phải từ 500.000đ trở lên. Các gói chụp đang có booking chưa hoàn thành sẽ không thể bị xóa.'
+}
+
+const INITIAL_OPTIONS = [
+  'Khi nào tôi rút được tiền?',
+  'Quy định đặt cọc thế nào?',
+  'Chính sách hủy lịch ra sao?',
+  'Làm sao để khiếu nại?'
 ]
 
-export default function FAQPage() {
-  const [openItems, setOpenItems] = useState<Record<string, boolean>>({})
+function generateId() {
+  return Math.random().toString(36).substring(2, 9)
+}
 
-  const toggleItem = (id: string) => {
-    setOpenItems(prev => ({ ...prev, [id]: !prev[id] }))
+function findAnswer(query: string): string {
+  const qStr = query.toLowerCase()
+  for (const [key, answer] of Object.entries(FAQ_KNOWLEDGE)) {
+    if (qStr.includes(key)) {
+      return answer
+    }
+  }
+  return 'Xin lỗi, tôi chưa hiểu rõ câu hỏi của bạn. Vui lòng chọn một trong các chủ đề gợi ý hoặc chia sẻ thêm chi tiết để tôi có thể hỗ trợ tốt hơn!'
+}
+
+export default function FAQPage() {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: generateId(),
+      type: 'bot',
+      text: 'Xin chào! Tôi là Trợ lý Ảo của PhotoMarket. Tôi có thể giúp gì cho bạn hôm nay?',
+      options: INITIAL_OPTIONS
+    }
+  ])
+  const [inputValue, setInputValue] = useState('')
+  const [isTyping, setIsTyping] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, isTyping])
+
+  const handleSend = (text: string) => {
+    if (!text.trim()) return
+
+    const userMsg: Message = { id: generateId(), type: 'user', text }
+    setMessages(prev => [...prev, userMsg])
+    setInputValue('')
+    setIsTyping(true)
+
+    // Simulate AI thinking delay
+    setTimeout(() => {
+      const responseText = findAnswer(text)
+      const botMsg: Message = {
+        id: generateId(),
+        type: 'bot',
+        text: responseText,
+        options: responseText.includes('Xin lỗi') ? INITIAL_OPTIONS : undefined
+      }
+      setMessages(prev => [...prev, botMsg])
+      setIsTyping(false)
+    }, 800 + Math.random() * 600)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSend(inputValue)
+    }
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-10 py-8">
-      <div className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 ring-4 ring-indigo-50/50">
-          <HelpCircle className="h-8 w-8" />
+    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-4xl flex-col rounded-[2.5rem] border border-slate-100 bg-white shadow-2xl shadow-slate-200/50 overflow-hidden">
+      {/* Chat Header */}
+      <div className="flex items-center gap-4 border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 shadow-sm">
+          <Sparkles className="h-6 w-6 text-white" />
+          <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-emerald-500"></span>
         </div>
-        <h1 className="text-3xl font-black text-slate-900 sm:text-4xl">Câu hỏi thường gặp</h1>
-        <p className="mt-4 text-slate-500">Mọi thông tin bạn cần biết về quy trình làm việc giữa Khách hàng và Nhiếp ảnh gia.</p>
+        <div>
+          <h1 className="text-lg font-black text-slate-900">Trợ lý Ảo PhotoMarket</h1>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Luôn trực tuyến</p>
+        </div>
       </div>
 
-      <div className="space-y-8">
-        {faqs.map((category, cIdx) => (
-          <div key={cIdx} className="space-y-4">
-            <h2 className="flex items-center gap-3 text-xl font-bold text-slate-800">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-100">
-                {category.icon}
-              </span>
-              {category.category}
-            </h2>
-            
-            <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-              {category.items.map((item, iIdx) => {
-                const id = `${cIdx}-${iIdx}`
-                const isOpen = openItems[id]
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/30">
+        <AnimatePresence initial={false}>
+          {messages.map((msg) => (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              className={`flex w-full ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div className={`flex max-w-[85%] gap-3 sm:max-w-[75%] ${msg.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                {/* Avatar */}
+                <div className={`flex shrink-0 h-8 w-8 items-center justify-center rounded-full ${msg.type === 'user' ? 'bg-slate-900' : 'bg-indigo-100 text-indigo-600 mt-1'}`}>
+                  {msg.type === 'user' ? <User className="h-4 w-4 text-white" /> : <Bot className="h-5 w-5" />}
+                </div>
 
-                return (
-                  <div key={iIdx} className="border-b border-slate-100 last:border-0">
-                    <button
-                      onClick={() => toggleItem(id)}
-                      className="flex w-full items-start justify-between gap-4 px-6 py-5 text-left transition-colors hover:bg-slate-50"
-                    >
-                      <span className="font-bold text-slate-900">{item.q}</span>
-                      <ChevronDown
-                        className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${
-                          isOpen ? 'rotate-180 text-indigo-500' : ''
-                        }`}
-                      />
-                    </button>
-                    <AnimatePresence>
-                      {isOpen && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="px-6 pb-5 pt-0 text-sm leading-relaxed text-slate-600">
-                            {item.a}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                {/* Content */}
+                <div className={`flex flex-col gap-2 ${msg.type === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`rounded-2xl px-5 py-3.5 text-sm leading-relaxed shadow-sm ${msg.type === 'user' ? 'bg-slate-900 text-white rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'}`}>
+                    {msg.text.split('\n').map((line, i) => <p key={i} className={i > 0 ? 'mt-2' : ''}>{line}</p>)}
                   </div>
-                )
-              })}
-            </div>
-          </div>
-        ))}
+
+                  {/* Options Chips */}
+                  {msg.options && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {msg.options.map((opt, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => handleSend(opt)}
+                          className="rounded-xl border border-indigo-100 bg-indigo-50/50 px-3 py-1.5 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-100 hover:text-indigo-700 active:scale-95"
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+
+          {/* Typing Indicator */}
+          {isTyping && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="flex w-full justify-start"
+            >
+              <div className="flex gap-3 max-w-[85%]">
+                <div className="flex shrink-0 h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 mt-1">
+                  <Bot className="h-5 w-5" />
+                </div>
+                <div className="rounded-2xl bg-white border border-slate-100 px-5 py-4 rounded-tl-none shadow-sm h-[48px] flex items-center justify-center gap-1.5">
+                  <motion.div animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0 }} className="h-2 w-2 rounded-full bg-indigo-400" />
+                  <motion.div animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} className="h-2 w-2 rounded-full bg-indigo-400" />
+                  <motion.div animate={{ y: [0, -5, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }} className="h-2 w-2 rounded-full bg-indigo-400" />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <div ref={messagesEndRef} />
       </div>
 
-      <div className="mt-12 rounded-3xl bg-indigo-600 p-8 text-center text-white shadow-xl shadow-indigo-600/20">
-        <h2 className="mb-3 text-xl font-black">Bạn vẫn chưa tìm được giải đáp?</h2>
-        <p className="mb-6 mx-auto max-w-lg text-indigo-100">
-          Hãy liên hệ trực tiếp với bộ phận hỗ trợ của chúng tôi, hoặc mở yêu cầu khiếu nại nếu bạn đang gặp vấn đề với đơn đặt lịch.
-        </p>
-        <button className="rounded-xl bg-white px-6 py-3 text-sm font-bold text-indigo-600 shadow-lg shadow-white/20 transition-all hover:bg-indigo-50 active:scale-95">
-          Gửi yêu cầu hỗ trợ
-        </button>
+      {/* Input Area */}
+      <div className="border-t border-slate-100 bg-white p-4 sm:p-6">
+        <div className="relative flex items-center">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Nhập câu hỏi của bạn (VD: Quy định đặt cọc thế nào?)"
+            className="w-full rounded-2xl border-none bg-slate-50 py-4 pl-5 pr-14 text-[13px] font-medium text-slate-900 outline-none ring-1 ring-slate-100 transition-all focus:bg-white focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
+          />
+          <button
+            onClick={() => handleSend(inputValue)}
+            disabled={!inputValue.trim()}
+            className="absolute right-2 flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white transition-all hover:bg-indigo-700 disabled:opacity-50 disabled:hover:bg-indigo-600 active:scale-95"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="mt-3 flex items-center justify-center gap-1.5 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+          <HelpCircle className="h-3.5 w-3.5" />
+          Trợ lý ảo có thể mắc sai lầm, vui lòng kiểm tra lại thông tin.
+        </div>
       </div>
     </div>
   )
