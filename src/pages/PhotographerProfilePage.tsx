@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { MapPin, Star, ArrowLeft, CalendarDays, X, Shield, Check } from 'lucide-react'
+import { MapPin, Star, ArrowLeft, CalendarDays, X, Shield, Check, Heart } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../store/AppStore'
 import BookingModal from '../components/BookingModal'
@@ -17,6 +17,7 @@ export default function PhotographerProfilePage() {
   const [bookingOpen, setBookingOpen] = useState(false)
   const [selectedPhotoset, setSelectedPhotoset] = useState<Photoset | null>(null)
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
+  const [isFavorite, setIsFavorite] = useState(false)
 
   function openBooking() {
     setBookingOpen(true)
@@ -89,12 +90,25 @@ export default function PhotographerProfilePage() {
             </div>
 
             {photographer.status === 'APPROVED' && (
-              <button
-                onClick={() => openBooking()}
-                className="inline-flex h-14 items-center justify-center gap-3 rounded-2xl bg-slate-900 px-10 text-[11px] font-black uppercase tracking-widest text-white shadow-2xl shadow-slate-900/20 transition-all hover:bg-slate-800 hover:scale-[1.02] active:scale-95"
-              >
-                <CalendarDays className="h-5 w-5" /> ĐẶT LỊCH
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsFavorite(!isFavorite)}
+                  title={isFavorite ? "Bỏ lưu Yêu thích" : "Lưu vào Yêu thích"}
+                  className={`flex h-14 w-14 items-center justify-center rounded-2xl border-2 transition-all active:scale-95 ${
+                    isFavorite
+                      ? 'border-rose-100 bg-rose-50 text-rose-500 hover:bg-rose-100'
+                      : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
+                  }`}
+                >
+                  <Heart className={`h-6 w-6 ${isFavorite ? 'fill-current' : ''}`} />
+                </button>
+                <button
+                  onClick={() => openBooking()}
+                  className="inline-flex h-14 items-center justify-center gap-3 rounded-2xl bg-slate-900 px-10 text-[11px] font-black uppercase tracking-widest text-white shadow-2xl shadow-slate-900/20 transition-all hover:bg-slate-800 hover:scale-[1.02] active:scale-95"
+                >
+                  <CalendarDays className="h-5 w-5" /> ĐẶT LỊCH
+                </button>
+              </div>
             )}
           </div>
         </div>
